@@ -2,10 +2,10 @@
 \label{sec:p2}
 
 \subsection{Descripción del problema}
-Se traslada un quadcóptero desde $\bp_0=(0,0,1)$\,m hasta $\bp_f=(4,2,1.3)$\,m atravesando el agujero de una pared mientras está invertido. Para ello ejecuta un \textit{snap roll}, una vuelta completa alrededor de su eje longitudinal ($\phi:0\to2\pi$), respetando límites de actuación e inclinación y terminando en reposo con yaw final de $90^\circ$. Se eligió este movimiento por su complejidad: combina una maniobra acrobática, una restricción geométrica de paso estrecho y condiciones terminales completas.
+Se traslada un quadcóptero desde $\bp_0=(0,0,1)$\,m hasta $\bp_f=(4,2,1.3)$\,m atravesando el agujero de una pared mientras está invertido. Para ello ejecuta un \textit{snap roll}, respetando límites de actuación e inclinación y terminando en reposo con yaw final de $90^\circ$. Se eligió este movimiento por su complejidad: combina una maniobra acrobática, una restricción geométrica de paso estrecho y condiciones terminales completas.
 
 \subsection{Modelo dinámico}
-Se usa un sistema inercial con $z$ hacia arriba y ángulos de Euler $ZYX$. El estado ($\RR^{12}$) y las entradas ($\RR^4$) son
+Se usa un sistema inercial con $z$ hacia arriba y ángulos de Euler $ZYX$. Las entradas ($\RR^4$) son
 \begin{equation*}
 \bx=\begin{bmatrix}\bp\tr&\bm{\eta}\tr&\bv\tr&\bomega\tr\end{bmatrix}\tr,\qquad
 \bu=\begin{bmatrix}F&\tau_x&\tau_y&\tau_z\end{bmatrix}\tr,
@@ -30,6 +30,13 @@ El quadcóptero se modela como dos brazos de longitud $\ell=0.17$\,m a lo largo 
 \bm b_2&=\begin{bmatrix}\cos\psi\sin\theta\sin\phi-\sin\psi\cos\phi\\ \sin\psi\sin\theta\sin\phi+\cos\psi\cos\phi\\ \cos\theta\sin\phi\end{bmatrix}.
 \end{align*}
 Con $\phi=\pi$ y $\theta\approx0$ el brazo $\bm b_2$ queda con componente $z$ nula en el cruce, lo que permite pasar por un agujero de apenas $0.50$\,m de alto.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\linewidth]{p2_snap_roll_secuencia.png}
+\caption{Secuencia del \textit{snap roll} (vista lateral), vista frontal en el cruce con $\phi=180^\circ$ y holguras de las puntas respecto del borde del agujero.}
+\label{fig:p2_sec}
+\end{figure}
 
 \subsection{Problema de control óptimo}
 \begin{equation*}
@@ -92,35 +99,30 @@ El NLP es no convexo. Como estimación inicial se emplea la referencia que pasa 
 
 Para evaluar la fidelidad respecto del modelo continuo, se integra nuevamente desde $\bx_0$ con DOP853 manteniendo cada $\bu_k$ constante, y se calculan: los defectos de continuidad, la diferencia entre nodos del NLP y la simulación, el error terminal, y el margen $\mathrm{marg}=\min_{i,\pm}\big(\text{semitamaño efectivo}-|\cdot|\big)$ de las cuatro puntas respecto del borde del agujero mientras el vehículo está dentro de la losa. Un margen positivo implica ausencia de contacto.
 
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{p2_estados.png}
+\caption{Posición y ángulos de Euler. Puntos: nodos del NLP; línea: integración DOP853. La línea punteada vertical marca el cruce ($t_c=3$\,s).}
+\label{fig:p2_estados}
+\end{figure}
+
 \subsection{Resultados}
-La Fig.~\ref{fig:p2_tray} muestra la trayectoria resultante frente a la recta nominal: el vehículo desciende, asciende hasta alinearse con el agujero a $z\approx1.1$\,m, lo cruza en $t=3$\,s con $\phi=180^\circ$ (boca abajo) y luego se estabiliza en $\bp_f$. La Fig.~\ref{fig:p2_estados} compara los nodos del NLP con la integración continua; el roll pasa de $0$ a $360^\circ$ en una ventana corta alrededor del cruce, el yaw alcanza $90^\circ$ al final y el cabeceo llega al límite de $\approx31.5^\circ$ justo en el cruce. Los controles (Fig.~\ref{fig:p2_controles}) muestran el impulso de empuje antes y después del cruce (máximo $\approx15$\,N, por debajo de $2mg\approx19.6$\,N) y saturación de $\tau_x$ en $\pm1$\,N\,m, que es el momento necesario para ejecutar el giro rápido de roll. Finalmente, la Fig.~\ref{fig:p2_sec} muestra la secuencia del \textit{snap roll}, la vista frontal en el cruce y las holguras: las puntas de los rotores permanecen dentro del agujero con márgenes mínimos positivos de $\approx0.03$\,m en $z$ y $\approx0.037$\,m en $y$ mientras el vehículo está dentro de la losa, es decir, sin contacto.
+La Fig.~\ref{fig:p2_tray} muestra la trayectoria resultante frente a la recta nominal: el vehículo desciende, asciende hasta alinearse con el agujero a $z\approx1.1$\,m, lo cruza en $t=3$\,s con $\phi=180^\circ$ (boca abajo) y luego se estabiliza en $\bp_f$. La Fig.~\ref{fig:p2_estados} compara los nodos del NLP con la integración continua; el roll pasa de $0$ a $360^\circ$ en una ventana corta alrededor del cruce, el yaw alcanza $90^\circ$ al final y el cabeceo llega al límite de $\approx31.5^\circ$ justo en el cruce. Los controles (Fig.~\ref{fig:p2_controles}) muestran el impulso de empuje antes y después del cruce (máximo $\approx15$\,N, por debajo de $2mg\approx19.6$\,N) y saturación de $\tau_x$ en $\pm1$\,N\,m, que es el momento necesario para ejecutar el giro rápido de roll. 
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.85\linewidth]{p2_trayectoria.png}
-\caption{Pregunta 2: trayectoria 3D, vista superior y lateral frente a la recta nominal. Los bloques naranjas son la pared con su agujero.}
+\caption{Trayectoria 3D, vista superior y lateral frente a la recta nominal.}
 \label{fig:p2_tray}
 \end{figure}
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.85\linewidth]{p2_estados.png}
-\caption{Pregunta 2: posición y ángulos de Euler. Puntos: nodos del NLP; línea: integración DOP853. La línea punteada vertical marca el cruce ($t_c=3$\,s).}
-\label{fig:p2_estados}
-\end{figure}
+Finalmente, la Fig.~\ref{fig:p2_sec} muestra la secuencia del \textit{snap roll}, la vista frontal en el cruce y las holguras: las puntas de los rotores permanecen dentro del agujero con márgenes mínimos positivos de $\approx0.03$\,m en $z$ y $\approx0.037$\,m en $y$ mientras el vehículo está dentro de la losa, es decir, sin contacto.
 
 \begin{figure}[h]
 \centering
 \includegraphics[width=0.85\linewidth]{p2_controles.png}
-\caption{Pregunta 2: controles óptimos (constantes por intervalo). Las líneas rojas punteadas son los límites de actuación.}
+\caption{Controles óptimos.}
 \label{fig:p2_controles}
 \end{figure}
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.95\linewidth]{p2_snap_roll_secuencia.png}
-\caption{Pregunta 2: secuencia del \textit{snap roll} (vista lateral), vista frontal en el cruce con $\phi=180^\circ$ y holguras de las puntas respecto del borde del agujero.}
-\label{fig:p2_sec}
-\end{figure}
-
-\textbf{Animación.} Se entrega \texttt{p2\_snap\_roll.gif}, construida con los estados de la simulación independiente: los dos brazos del vehículo se dibujan rotados con $\bR(\phi,\theta,\psi)$, el punto rojo marca el extremo delantero del brazo $x$ y permite ver cuándo el vehículo está boca abajo.
+\textbf{Animación.} Se adjunta \texttt{p2\_snap\_roll.gif}. El punto rojo marca el extremo delantero del brazo $x$.
