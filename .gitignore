@@ -1,0 +1,14 @@
+main.aux
+main.bbl
+main.blg
+main.fdb_latexmk
+main.fls
+main.log
+main.synctex.gz
+main.synctex(busy)
+main.lof
+main.lot
+main.toc
+
+# Python
+__pycache__/
