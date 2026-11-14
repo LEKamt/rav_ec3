@@ -1,182 +1,485 @@
 % ============================================================
-%  Demo for the "terminal" Beamer theme.
-%  Compile with XeLaTeX or LuaLaTeX (twice, for the frame count).
-%  On Overleaf: Menu > Settings > Compiler > XeLaTeX.
+%  Evaluacion Continua 3: Optimizacion de Trayectorias
+%  Tema: Terminal Beamer Theme
+%  Autores: Luis Kamt & Kenyi Reyes (UTEC)
 % ============================================================
 \documentclass[aspectratio=169,10pt]{beamer}
-\usetheme{terminal}            % options: nosectionpages, noprogressbar
+\usetheme{terminal}            % opciones: nosectionpages, noprogressbar
 
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,amsfonts,bm}
 \usepackage{booktabs}
-\usepackage{appendixnumberbeamer} % backup slides don't count in [nn/NN]
+\usepackage{graphicx}
+\usepackage{appendixnumberbeamer}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usetikzlibrary{arrows.meta,positioning}
 
-% ---------- theme settings ----------
-\terminalfootprefix{demo}               % footline: "demo :: <short title>"
-\terminalwindow{talk.tex}               % label in the title window bar
-\terminalshell{%                        % fake shell session on the title page
-  \$ make talk\\
-  > compiling slides ............. ok\\
-  > checking the coffee .......... ok}
+\graphicspath{{figures/}{../report/figures/}}
 
-\title[Terminal theme]{The Terminal Theme\\for Beamer}
-\subtitle{Retro, monospaced, black and white}
-\author{[Your Name]}
-\institute{[Affiliation]}
+% ---------- Macros matematicos ----------
+\newcommand{\bp}{\bm{p}}
+\newcommand{\bv}{\bm{v}}
+\newcommand{\bx}{\bm{x}}
+\newcommand{\bu}{\bm{u}}
+\newcommand{\bz}{\bm{z}}
+\newcommand{\bef}{\bm{f}}
+\newcommand{\bd}{\bm{d}}
+\newcommand{\bomega}{\bm{\omega}}
+\newcommand{\btau}{\bm{\tau}}
+\newcommand{\bR}{\mathbf{R}}
+\newcommand{\RR}{\mathbb{R}}
+\newcommand{\tr}{^{\top}}
+
+% ---------- Configuracion del tema Terminal ----------
+\terminalfootprefix{EC3}
+\terminalwindow{evaluacion3.tex}
+\terminalshell{%
+  \$ python -m trajectory\_optimization --cases all\\
+  > problem 1: quadruped jump over obstacle (SRBM) ..... ok [IPOPT]\\
+  > problem 2: quadcopter snap roll through wall ....... ok [IPOPT]\\
+  > status: optimal solution found (exit code 0)}
+
+\title[Optimizacion de Trayectorias]{Optimizacion de Trayectorias por Multiple Shooting}
+\subtitle{Evaluacion Continua 3 -- Cuadrupedo (SRBM) y Quadcoptero (Snap Roll)}
+\author{Luis Kamt \and Kenyi Reyes}
+\institute{Ingenieria Mecatronica -- Universidad de Ingenieria y Tecnologia (UTEC)}
 \date{\today}
 
 \begin{document}
 
+% ------------------------------------------------------------
+% Portada
+% ------------------------------------------------------------
 \begin{frame}[plain,noframenumbering]
   \titlepage
 \end{frame}
 
+% ------------------------------------------------------------
+% Agenda
+% ------------------------------------------------------------
 \begin{frame}{Agenda}
-\begin{tbox}{> ls talk/}
+\begin{tbox}{> ls -l agenda/}
 \small
-\begin{tabular}{@{}l@{\quad}l@{}}
-01 & lists and text \\
-02 & boxes \\
-03 & tables, plots, diagrams \\
+\begin{tabular}{@{}llp{8.5cm}@{}}
+\textbf{01} & \textbf{Introduccion} & Multiple Shooting y formulacion general NLP \\
+\textbf{02} & \textbf{Caso 1: Cuadrupedo} & Salto sobre obstaculo con modelo SRBM y 5 fases \\
+\textbf{03} & \textbf{Caso 2: Quadcoptero} & Maniobra acrobatica \textit{snap roll} invertido a traves de pared \\
+\textbf{04} & \textbf{Resultados} & Analisis de trayectorias, estados, controles y animaciones \\
+\textbf{05} & \textbf{Conclusiones} & Comparacion de metodos, ventajas y validacion continua \\
 \end{tabular}
 \end{tbox}
 \end{frame}
 
 % ============================================================
-\section{LISTS AND TEXT}
+\section{INTRODUCCION}
+% ============================================================
 
-\begin{frame}{Lists}
+\begin{frame}{Metodologia: Multiple Shooting Directo}
 \begin{columns}[T]
 \begin{column}{0.48\textwidth}
+\begin{tbox}{Principio de Multiple Shooting}
+\small
 \begin{itemize}
-\item items get a \textbf{>} prompt
-  \begin{itemize}
-  \item subitems get a dash
-  \end{itemize}
-\item \alert{alerted text} is bold, not coloured
-\item math stays in Computer Modern: $\sum_{i=1}^{n} i = \tfrac{n(n+1)}{2}$
+\item Se discretiza el horizonte temporal en $N$ intervalos $[t_k, t_{k+1}]$ de duracion $h_k$.
+\item Estados $\bx_k$ y controles $\bu_k$ son variables de decision independientes en el NLP.
+\item \textbf{Continuidad dinamica:}
+\begin{equation*}
+\bx_{k+1} - \bm{\Psi}_k(\bx_k, \bu_k, h_k) = \mathbf{0}
+\end{equation*}
+donde $\bm{\Psi}_k$ integra el sistema mediante \textbf{RK4} en subpasos de $h_k/2$.
 \end{itemize}
+\end{tbox}
 \end{column}
+
 \begin{column}{0.48\textwidth}
-\begin{enumerate}
-\item enumerate uses brackets
-\item like option flags
-\item[\inv{!}] or anything you like
-\end{enumerate}
-\vskip8pt
-\texttt{monospace everywhere}, \emph{even italics}.
+\begin{tbox}{Ventajas Computacionales}
+\small
+\begin{itemize}
+\item \textbf{Estabilidad numerica:} evita la divergencia por integracion en horizontes largos (problema tipico de \textit{single shooting}).
+\item \textbf{Esparsidad estructural:} Jacobiano y Hessiano altamente esparsos, optimos para solucionadores NLP como \textbf{IPOPT}.
+\item \textbf{Restricciones intermedias:} acoplamiento directo de eventos hibridos (contactos, cruces y geometrias complejas).
+\end{itemize}
+\end{tbox}
 \end{column}
 \end{columns}
-\src{Sources go bottom right with \texttt{\textbackslash src}}
+\src{CasADi + IPOPT con estrategia de barrera adaptativa}
 \end{frame}
 
 % ============================================================
-\section{BOXES}
+\section{CUADRUPEDO: SALTO}
+% ============================================================
 
-\begin{frame}{Boxes}
+\begin{frame}{P1: Modelo Dinamico del Cuadrupedo (SRBM)}
 \begin{columns}[T]
-\begin{column}{0.48\textwidth}
-\begin{tbox}{tbox: a window with a title}
-\small
-\texttt{\textbackslash begin\{tbox\}\{title\}}\\
-hard drop shadow, sharp corners
-\end{tbox}
-\vskip10pt
-\begin{pbox}
-\small
-pbox: the same panel, without a title bar
-\end{pbox}
-\end{column}
-\begin{column}{0.48\textwidth}
-\begin{block}{block: Beamer's own}
-\small
-\texttt{block}, \texttt{alertblock} and \texttt{exampleblock} are restyled too
-\end{block}
-\vskip10pt
-\begin{ibox}
-ibox: an inverse-video banner
-\end{ibox}
-\vskip10pt
-\centering\inv{3.6$\times$}\quad\inv{inline \textbackslash inv}
-\end{column}
-\end{columns}
-\end{frame}
-
-\begin{frame}{Overlays work as usual}
-\begin{tbox}{> run -{}-step}
-\small
+\begin{column}{0.50\textwidth}
+\begin{tbox}{Estado y Entradas}
+\footnotesize
+\textbf{Estado} $\bx \in \RR^{12}$ y \textbf{Control} $\bu \in \RR^{12}$:
+\begin{align*}
+\bx &= \begin{bmatrix}\bp\tr & \bm{\eta}\tr & \bv\tr & {}^b\bomega\tr\end{bmatrix}\tr\\
+\bu &= \begin{bmatrix}\bef_{FR}\tr & \bef_{FL}\tr & \bef_{RR}\tr & \bef_{RL}\tr\end{bmatrix}\tr
+\end{align*}
 \begin{itemize}
-\item<1-> first this
-\item<2-> then this
-\item<3-> and finally this\,\terminalcursor
+\item $\bp=(x,y,z)$: posicion del CdM en $\{W\}$.
+\item $\bm{\eta}=(\phi,\theta,\psi)$: orientacion roll--pitch--yaw.
+\item $\bef_i$: fuerza de contacto del suelo sobre el pie $i$.
 \end{itemize}
 \end{tbox}
+\end{column}
+
+\begin{column}{0.46\textwidth}
+\begin{tbox}{Ecuaciones de Movimiento}
+\footnotesize
+\begin{align*}
+\dot{\bp} &= \bv \\
+\dot{\bv} &= \mathbf{g} + \frac{1}{m}\sum_{i=1}^4 \bef_i \\
+\dot{\bm{\eta}} &= E(\phi,\theta)\,{}^b\bomega \\
+I\,{}^b\dot{\bomega} &= {}^w\bR_b\tr \sum_{i=1}^4 (\bp_i - \bp)\times \bef_i - {}^b\bomega \times (I\,{}^b\bomega)
+\end{align*}
+Patas modeladas sin masa (SRBM); parametros leidos directamente del URDF del Go2.
+\end{tbox}
+\end{column}
+\end{columns}
+\src{Cinematica rotacional con matriz $E(\phi,\theta)$ y orientacion $\bR = \bR_z(\psi)\bR_y(\theta)\bR_x(\phi)$}
 \end{frame}
 
-% ============================================================
-\section{TABLES AND PLOTS}
-
-\begin{frame}{A table}
-\centering\footnotesize
-\begin{tabular}{@{}lrrr@{}}
+\begin{frame}{P1: Secuencia de Fases y Contactos}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Estructura de 5 Fases ($N=88$ nodos)}
+\scriptsize
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{@{}clccc@{}}
 \toprule
-config & time (s) & memory (MB) & speed-up \\
+$j$ & Descripcion & Apoyos $\mathcal{S}_j$ & $N_j$ & $T_j$ (s) \\
 \midrule
-small  & 31.3  & 457  & \textbf{2.8} \\
-medium & 52.6  & 946  & \textbf{2.8} \\
-large  & 118.4 & 2505 & \textbf{3.6} \\
+1 & Impulso 4 patas & FR, FL, RR, RL & 22 & $[0.25,\,0.80]$ \\
+2 & Impulso traseras & RR, RL & 10 & $[0.05,\,0.15]$ \\
+3 & Vuelo libre & $\emptyset$ & 24 & $[0.15,\,1.70]$ \\
+4 & Aterrizaje delanteras & FR, FL & 10 & $[0.05,\,0.15]$ \\
+5 & Apoyo 4 patas & FR, FL, RR, RL & 22 & $[0.25,\,0.80]$ \\
 \bottomrule
-\end{tabular}
-\vskip14pt
-\raggedright
-\begin{itemize}\small
-\item \texttt{booktabs} rules suit the black-and-white look
+\end{tabular}}
+\vskip4pt
+Las duraciones $T_j$ son variables de decision acotadas: $h_k = T_{j(k)}/N_{j(k)}$.
+\end{tbox}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Restricciones Fisicas de Contacto}
+\small
+\begin{itemize}
+\item \textbf{Friccion y fuerza normal:}
+\begin{gather*}
+0 \le f_{z,i} \le 220\,\text{N}\\
+|f_{x,i}| \le \mu f_{z,i},\quad |f_{y,i}| \le \mu f_{z,i}
+\end{gather*}
+con coeficiente de friccion $\mu = 0.70$.
+\item \textbf{Pata en vuelo:} $\bef_i = \mathbf{0}$ si $i \notin \mathcal{S}_{j(k)}$.
+\item \textbf{Alcance de pata:} $0.20 \le \|\bd_i\| \le 0.39$\,m, donde $\bd_i$ es el vector cadera--pie en $\{B\}$.
 \end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
 \end{frame}
 
-\begin{frame}{A plot and a diagram}
-\begin{columns}[c]
-\begin{column}{0.55\textwidth}
-\centering
-\begin{tikzpicture}
-\begin{axis}[width=7.6cm,height=5cm,xlabel={input size},ylabel={time},
-  tick label style={font=\scriptsize},label style={font=\footnotesize},
-  legend style={font=\scriptsize,draw=black,at={(0.02,0.98)},anchor=north west},
-  axis line style={line width=0.6pt},grid=major,grid style={black!12}]
-\addplot[black,line width=1pt,mark=*,mark size=1.8pt] coordinates {(1,1.2)(2,2.3)(4,4.1)(8,8.4)};
-\addlegendentry{baseline}
-\addplot[black,line width=1pt,dashed,mark=o,mark size=1.8pt] coordinates {(1,0.5)(2,0.8)(4,1.3)(8,2.2)};
-\addlegendentry{ours}
-\end{axis}
-\end{tikzpicture}
+\begin{frame}{P1: Obstaculo Suave y Optimizacion NLP}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Obstaculo Diferenciable}
+\small
+Caja de $H=0.25$\,m en $x \in [0.42, 0.67]$\,m aproximada mediante producto de sigmoides:
+\begin{equation*}
+\begin{aligned}
+h_{\mathrm{obs}}(x) = (H+\delta)\,&\sigma\big(k(x-x_1+\delta)\big)\\
+\cdot\,&\sigma\big(k(x_2+\delta-x)\big)
+\end{aligned}
+\end{equation*}
+\begin{itemize}
+\item Margen de inflado: $\delta = 3$\,cm, $k=80$.
+\item Se exige $z_c \ge h_{\mathrm{obs}}(x_c)$ para esquinas del tronco, rodillas y pies durante todo el salto.
+\end{itemize}
+\end{tbox}
 \end{column}
-\begin{column}{0.42\textwidth}
+
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Problema NLP y Costo}
+\small
+\begin{equation*}
+J = \sum_{k=0}^{N-1} h_k \ell_k + 0.02 \sum_{k=1}^{N-1} \Big\|\frac{\Delta \bu_k}{mg}\Big\|^2
+\end{equation*}
+\begin{equation*}
+\ell_k = \Big\|\frac{\bu_k - \bu_k^{\mathrm{est}}}{mg}\Big\|^2 + 0.05\|{}^b\bomega_k\|^2 + 2(\phi_k^2 + \psi_k^2)
+\end{equation*}
+\begin{itemize}
+\item Penaliza desviacion del apoyo estatico $\bu_k^{\mathrm{est}}$.
+\item Regulariza variacion temporal de fuerzas.
+\end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{P1: Cinematica Inversa y Torques Articulares}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Cinematica Inversa Analitica}
+\small
+Para cada pata $i$ ($q_0$: abduccion, $q_1$: cadera, $q_2$: rodilla):
+\begin{itemize}
+\item \textbf{En apoyo:} posicion del pie fija en el suelo:
+\begin{equation*}
+\bm{q}_i = \mathrm{CI}_i\big({}^w\bR_b\tr(\bp_i^c - \bp)\big)
+\end{equation*}
+\item \textbf{En vuelo:} interpolacion quintica articular suave entre despegue, pose recogida y aterrizaje.
+\end{itemize}
+\end{tbox}
+\end{column}
+
+\begin{column}{0.48\textwidth}
+\begin{tbox}{Mapeo a Torques de Motores}
+\small
+Los torques requeridos en los motores para producir las fuerzas optimas de contacto se obtienen via el \textbf{Jacobiano}:
+\begin{equation*}
+\btau_i = -J_i(\bm{q}_i)\tr\,{}^w\bR_b\tr\,\bef_i
+\end{equation*}
+\begin{itemize}
+\item Permite validar que los actuadores no superen limites termicos ni de torque maximo.
+\end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{P1: Resultados -- Secuencia del Salto}
+\begin{center}
+\includegraphics[width=0.56\textwidth]{p1_secuencia.png}
+\end{center}
+\begin{tbox}{Dinamica del Salto Observada}
+\scriptsize
+\begin{itemize}
+\item \textbf{Fase 1 (Agachado):} El CdM desciende hasta $\approx 0.20$\,m acumulando energia potencial/cinetica.
+\item \textbf{Fase 2 (Despegue):} Impulso final con patas traseras; despegue con $v_x \approx 2$\,m/s, $v_z \approx 2$\,m/s.
+\item \textbf{Fase 3 (Vuelo):} Apice a $z_{\max} \approx 0.59$\,m, patas recogidas superando ampliamente el obstaculo de $0.25$\,m.
+\item \textbf{Fases 4-5 (Aterrizaje):} Contacto secuencial (delanteras $\to$ traseras), frenado y estabilizacion en $x_f=1.20$\,m.
+\end{itemize}
+\end{tbox}
+\src{Animaciones: \texttt{p1\_salto.gif} y \texttt{p1\_salto\_slow.gif}}
+\end{frame}
+
+\begin{frame}{P1: Resultados -- Estados del Cuerpo Rigido}
+\begin{columns}[c]
+\begin{column}{0.58\textwidth}
 \centering
-\begin{tikzpicture}[st/.style={draw=black,line width=0.8pt,minimum height=0.8cm,
-    text width=2.4cm,align=center,font=\footnotesize,fill=white},
-  arr/.style={-{Stealth[length=5pt]},line width=0.8pt}]
-\node[st] (a) {input};
-\node[st,fill=black,text=white,below=0.5cm of a] (b) {\textbf{process}};
-\node[st,below=0.5cm of b] (c) {output};
-\draw[arr] (a) -- (b); \draw[arr] (b) -- (c);
-\end{tikzpicture}
+\includegraphics[width=\linewidth]{p1_estados.png}
+\end{column}
+\begin{column}{0.38\textwidth}
+\begin{tbox}{Evolucion Temporal}
+\scriptsize
+\begin{itemize}
+\item Las 5 fases se distinguen claramente por las bandas sombreadas.
+\item El cabeceo $\theta$ (pitch) rota hacia arriba en el impulso ($\approx +15^\circ$) y se nivela suavemente para el aterrizaje.
+\item Roll ($\phi$) y Yaw ($\psi$) se mantienen cercanos a cero por la fuerte penalizacion y simetria.
+\item Duracion total optimizada: $\approx 2.1$\,s.
+\end{itemize}
+\end{tbox}
 \end{column}
 \end{columns}
 \end{frame}
 
 % ============================================================
-\terminalscreen{\$ talk -{}-questions}{QUESTIONS?}{[Your Name] \quad//\quad [email]}
+\section{QUADCÓPTERO: SNAP ROLL}
+% ============================================================
 
-\appendix
-\section*{BACKUP}
+\begin{frame}{P2: Modelo Dinamico del Quadcoptero}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{tbox}{Estados y Actuacion}
+\footnotesize
+\textbf{Estado} $\bx \in \RR^{12}$ y \textbf{Control} $\bu \in \RR^4$:
+\begin{align*}
+\bx &= \begin{bmatrix}\bp\tr & \bm{\eta}\tr & \bv\tr & \bomega\tr\end{bmatrix}\tr\\
+\bu &= \begin{bmatrix}F & \tau_x & \tau_y & \tau_z\end{bmatrix}\tr
+\end{align*}
+\begin{itemize}
+\item $F$: empuje total colectivo a lo largo del eje $z$ del cuerpo.
+\item $\btau = (\tau_x,\tau_y,\tau_z)$: momentos de control.
+\item Parametros: $m=1$\,kg, $I=\mathrm{diag}(0.02, 0.02, 0.04)\,\text{kg}\cdot\text{m}^2$.
+\end{itemize}
+\end{tbox}
+\end{column}
 
-\begin{frame}{Backup slide}
-\begin{tbox}{note}
+\begin{column}{0.46\textwidth}
+\begin{tbox}{Dinamica SE(3)}
+\footnotesize
+\begin{align*}
+\dot{\bp} &= \bv \\
+m\dot{\bv} &= F\,\bR(\bm{\eta})\mathbf{e}_3 - mg\,\mathbf{e}_3 \\
+\dot{\bm{\eta}} &= E(\phi,\theta)\,\bomega \\
+I\dot{\bomega} &= \btau - \bomega \times (I\bomega)
+\end{align*}
+\begin{itemize}
+\item Orientacion por angulos Euler ZYX.
+\item Se acota $|\theta| \le \theta_{\max} = 0.55$\,rad ($\approx 31.5^\circ$) para evitar la singularidad del gimbal lock.
+\end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
+\src{Condiciones: $\bp_0=(0,0,1)$\,m a $\bp_f=(4,2,1.3)$\,m en $T=6$\,s con $\psi_f=90^\circ$}
+\end{frame}
+
+\begin{frame}{P2: Geometria de la Pared y Maniobra Invertida}
+\begin{columns}[T]
+\begin{column}{0.50\textwidth}
+\begin{tbox}{Geometria de la Ventana}
 \small
-after \texttt{\textbackslash appendix}, slides are not counted in the footline total
+Pared en $x_w=2$\,m (espesor $e=0.06$\,m) con orificio centrado en $\bm{c}_h = (2, 1, 1)$\,m:
+\begin{equation*}
+|y - y_h| \le a,\quad |z - z_h| \le b
+\end{equation*}
+con semiancho $a=0.32$\,m y semialtura $b=0.25$\,m.
+\vskip4pt
+Brazos del quad: $\ell=0.17$\,m, radio rotores $r_r=0.03$\,m.
+\end{tbox}
+\end{column}
+
+\begin{column}{0.46\textwidth}
+\begin{tbox}{Ventaja del Snap Roll}
+\small
+\begin{itemize}
+\item Al cruzar boca abajo ($\phi = 180^\circ = \pi$):
+\begin{equation*}
+\bm{b}_2 \cdot \mathbf{e}_3 \approx 0
+\end{equation*}
+\item El brazo transversal se alinea horizontalmente con la apertura ancha ($a=0.32$\,m).
+\item Permite atravesar un hueco de solo $0.50$\,m de altura total sin colision.
+\end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{P2: Formulacion del NLP (Multiple Shooting)}
+\begin{tbox}{Malla Discreta y Restricciones de Cruce ($N=70$ intervalos, $T=6$\,s)}
+\small
+\begin{itemize}
+\item \textbf{Nodo de cruce:} $k_c = N/2 = 35$ ($t_c = 3.0$\,s).
+\item \textbf{Cruce estricto invertido:} $\phi_{k_c} = \pi$, $x_{k_c} = x_w = 2.0$\,m, y velocidad minima de paso $v_{x,k_c} \ge 2.4$\,m/s.
+\item \textbf{Paso asegurado entre caras:} $x_{k_c-1} \le x_w - e/2$ y $x_{k_c+1} \ge x_w + e/2$.
+\item \textbf{Holguras de las 4 puntas de rotor} con margen de seguridad $\delta=0.03$\,m:
+\begin{equation*}
+\big|(y - y_h) \pm \ell\,\bm{b}_i \cdot \mathbf{e}_2\big| \le a - r_r - \delta, \qquad
+\big|(z - z_h) \pm \ell\,\bm{b}_i \cdot \mathbf{e}_3\big| \le b - r_r - \delta
+\end{equation*}
+\end{itemize}
+\end{tbox}
+\vskip6pt
+\begin{pbox}
+\footnotesize
+\textbf{Funcion de Costo:} Penaliza desviaciones de trayectoria de referencia (curvas quinticas / Hermite), minimiza esfuerzo de empuje $(F-mg)^2$, momento $\|\btau\|^2$ y variaciones suaves de control $\|\Delta \bu\|^2$.
+\end{pbox}
+\end{frame}
+
+\begin{frame}{P2: Resultados -- Trayectoria y Maniobra 3D}
+\begin{columns}[c]
+\begin{column}{0.54\textwidth}
+\centering
+\includegraphics[width=\linewidth]{p2_trayectoria.png}
+\end{column}
+\begin{column}{0.44\textwidth}
+\begin{tbox}{Comportamiento Cinematico}
+\scriptsize
+\begin{itemize}
+\item El dron se desvia de la linea recta nominal: desciende inicialmente para ganar velocidad y luego se nivela a la altura del orificio ($z \approx 1.1$\,m).
+\item Tras cruzar el orificio invertido, recupera la posicion horizontal y gira en yaw hacia los $90^\circ$ solicitados.
+\item Llegada en reposo suave a $\bp_f = (4, 2, 1.3)$\,m.
+\end{itemize}
+\end{tbox}
+\end{column}
+\end{columns}
+\src{Animacion: \texttt{p2\_snap\_roll.gif} (extremo rojo indica brazo delantero)}
+\end{frame}
+
+\begin{frame}{P2: Resultados -- Holguras y Vista en el Cruce}
+\begin{center}
+\includegraphics[width=0.88\textwidth]{p2_snap_roll_secuencia.png}
+\end{center}
+\begin{tbox}{Verificacion de Holguras}
+\scriptsize
+\begin{itemize}
+\item Durante el cruce de la pared, las 4 puntas de los rotores presentan margenes de holgura positivos: $\Delta y_{\min} \approx 3.7$\,cm y $\Delta z_{\min} \approx 3.0$\,cm respecto al marco de la pared.
+\item Garantiza que no existe colision fisica durante la maniobra acrobatica.
+\end{itemize}
 \end{tbox}
 \end{frame}
+
+\begin{frame}{P2: Verificacion con Integrador Continuo DOP853}
+\begin{columns}[T]
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{p2_estados.png}
+\vskip2pt
+{\tiny \textbf{Estados:} Puntos (NLP) vs Linea continua (DOP853)}
+\end{column}
+\begin{column}{0.48\textwidth}
+\centering
+\includegraphics[width=\linewidth]{p2_controles.png}
+\vskip2pt
+{\tiny \textbf{Controles:} Empuje $F$ y momentos de control $\btau$}
+\end{column}
+\end{columns}
+\vskip4pt
+\begin{tbox}{Fidelidad de la Solucion}
+\scriptsize
+\begin{itemize}
+\item Coincidencia casi exacta entre la solucion discreta del NLP y la integracion continua con DOP853 (defectos de continuidad $< 10^{-4}$).
+\item $\tau_x$ satura en $\pm 1\,\text{N}\cdot\text{m}$ (limite fisico) para ejecutar el giro rapido de roll de $360^\circ$ en $1.0$\,s.
+\end{itemize}
+\end{tbox}
+\end{frame}
+
+% ============================================================
+\section{SINTESIS Y CONCLUSIONES}
+% ============================================================
+
+\begin{frame}{Comparacion de Ambos Problemas}
+\centering\footnotesize
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Caracteristica} & \textbf{Problema 1: Cuadrupedo} & \textbf{Problema 2: Quadcoptero} \\
+\midrule
+\textbf{Sistema} & Robot terrestre Go2 (SRBM) & Vehiculo aereo autonomo (UAV) \\
+\textbf{Complejidad} & Sistema hibrido (5 fases de contacto) & Maniobra acrobatica SE(3) \\
+\textbf{Restriccion Clave} & Despegue, aterrizaje y cono de friccion & Cruce invertido en ventana estrecha \\
+\textbf{Discretizacion} & $N=88$ intervalos, $T_j$ variables & $N=70$ intervalos, $T=6$\,s fijo \\
+\textbf{Variables Decision} & $\approx 2200$ (estados, fuerzas, tiempos, pies) & $1120$ (estados y controles) \\
+\textbf{Restricciones Din.} & $1056$ igualdades RK4 & $840$ igualdades RK4 \\
+\textbf{Solucionador} & CasADi + IPOPT & CasADi + IPOPT \\
+\textbf{Validacion} & Cinematica inversa y torques articulares & Integracion continua DOP853 \\
+\bottomrule
+\end{tabular}}
+\end{frame}
+
+\begin{frame}{Conclusiones}
+\begin{tbox}{Aportes Principales}
+\small
+\begin{itemize}
+\item \textbf{Eficacia de Multiple Shooting:} Probo ser altamente superior frente a esquemas de tiro simple, resolviendo problemas no lineales severos y no convexos con convergencia garantizada en IPOPT.
+\item \textbf{Manejo de Dinamicas Hibridas:} Permitio optimizar conjuntamente la duracion de cada fase y la ubicacion de pisada en el robot cuadrúpedo, superando un obstaculo inerte de $0.25$\,m sin requerir contacto sobre el.
+\item \textbf{Exploracion de Maniobras Extremas:} La orientacion acrobática de $180^\circ$ en el quadcoptero explota la geometria del vehiculo para franquear un orificio geometricamente limitante.
+\item \textbf{Fidelidad Dinamica:} Las simulaciones de integracion continua (DOP853) confirman la viabilidad fisica de las trayectorias discretizadas obtenidas.
+\end{itemize}
+\end{tbox}
+\vskip6pt
+\begin{ibox}
+Ambas animaciones generadas confirman el exito de las trayectorias optimas
+\end{ibox}
+\end{frame}
+
+% ============================================================
+% Pantalla final
+% ============================================================
+\terminalscreen{\$ ./show\_results --interactive}{PREGUNTAS?}{Luis Kamt \quad//\quad Kenyi Reyes \quad--\quad UTEC 2026}
 
 \end{document}
