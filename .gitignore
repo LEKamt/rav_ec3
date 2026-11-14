@@ -9,6 +9,8 @@ main.synctex(busy)
 main.lof
 main.lot
 main.toc
+main.nav
+main.snm
 
 # Python
 __pycache__/
