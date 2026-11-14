@@ -1,0 +1,6 @@
+casadi>=3.6
+numpy
+scipy
+matplotlib>=3.6
+pillow
+jupyter
